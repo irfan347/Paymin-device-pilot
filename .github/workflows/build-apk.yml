@@ -1,39 +1,59 @@
-name: Build Paymint APK
+name: Build APK
+
 on:
-  workflow_dispatch:
   push:
-    paths: ['.github/workflows/build-apk.yml']
-permissions:
-  contents: read
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip the project
+        run: |
+          ZIP=$(ls *.zip | head -1)
+          echo "Using $ZIP"
+          unzip -o "$ZIP" -d _src
+          PROJ=$(dirname "$(find _src -name settings.gradle | head -1)")
+          echo "PROJ=$PROJ" >> $GITHUB_ENV
+          echo "Project dir: $PROJ"
+
+      - name: Set server URL (optional, from repo variable PAYMINT_URL)
+        if: ${{ vars.PAYMINT_URL != '' }}
+        run: sed -i "s#https://your-paymint.onrender.com#${{ vars.PAYMINT_URL }}#g" "$PROJ/app/build.gradle"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-                
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Install SDK packages (using the runner's preinstalled SDK)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
-      - name: Restore Android pilot source
-        env:
-          ANDROID_SOURCE_ZIP: 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
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        run: cd "$PROJ" && gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Compute provisioning signature checksum
         run: |
-          python3 - <<'PYTHON'
-          import os, base64, io, zipfile
-          archive = zipfile.ZipFile(io.BytesIO(base64.b64decode(os.environ['ANDROID_SOURCE_ZIP'])))
-          archive.extractall('android')
-          PYTHON
-      - name: Compile test APK
-        run: gradle -p android :app:assembleDebug --no-daemon
+          APK="$PROJ/app/build/outputs/apk/debug/app-debug.apk"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          HEX=$("$BT/apksigner" verify --print-certs "$APK" | awk '/SHA-256 digest:/{print $NF; exit}')
+          printf '%s' "$HEX" | xxd -r -p | openssl base64 -A | tr '+/' '-_' | tr -d '=' > signature-checksum.txt
+          echo "PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM = $(cat signature-checksum.txt)"
+        continue-on-error: true
+
       - uses: actions/upload-artifact@v4
         with:
-          name: Paymint-test-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: erro
+          name: paymint-lock-debug-apk
+          path: |
+            ${{ env.PROJ }}/app/build/outputs/apk/debug/app-debug.apk
+            signature-checksum.txt
+          if-no-files-found: error
